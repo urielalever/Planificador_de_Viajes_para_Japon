@@ -3,6 +3,8 @@ from datetime import date, timedelta
 from functools import lru_cache
 import collections
 import collections.abc
+from fpdf import FPDF
+import io
 
 # Parche de compatibilidad para frozendict en Python 3.10+
 if not hasattr(collections, "Mapping"):
@@ -422,6 +424,48 @@ class SistemaViajesJapon(KnowledgeEngine):
                 "motivo": "El presupuesto ingresado es tan bajo que no cubre ni un solo día del viaje con las preferencias indicadas."
             }
 
+# FUNCION PARA EXPORTACIÓN PDF
+
+def generar_pdf(resultado, ciudad, personas):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Título principal
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(0, 10, txt=f"Itinerario Experto: {ciudad}", ln=True, align='C')
+    pdf.ln(5)
+
+    # Resumen de Costos
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, txt=f"Costo Total Actividades: USD {resultado['costo']}", ln=True)
+    pdf.ln(5)
+
+    # Alojamientos
+    pdf.set_font("Arial", 'B', 14)
+    pdf.cell(0, 10, txt="Estimacion de Hospedaje", ln=True)
+    pdf.set_font("Arial", size=11)
+    for aloj in resultado['alojamientos']:
+        # Limpiamos caracteres especiales o viñetas complejas para compatibilidad
+        texto_aloj = aloj.replace('•', '-')
+        pdf.multi_cell(0, 8, txt=texto_aloj)
+    pdf.ln(5)
+
+    # Itinerario
+    pdf.set_font("Arial", 'B', 14)
+    pdf.cell(0, 10, txt="Cronograma Diario Propuesto", ln=True)
+    pdf.set_font("Arial", size=11)
+    for d in resultado['itinerario']:
+        dia_num, nombre, costo_unit, costo_tot = d[0], d[1], d[2], d[3]
+        if "Descanso" in nombre:
+            texto = f"Dia {dia_num}: {nombre}"
+        else:
+            texto = f"Dia {dia_num}: {nombre} ({personas} pers. x USD {costo_unit} = USD {costo_tot})"
+        pdf.multi_cell(0, 8, txt=texto)
+
+    # Retornar el PDF como bytes para Streamlit
+    return bytes(pdf.output())
+
+
 # ==============================================================================
 # INTERFAZ STREAMLIT
 # ==============================================================================
@@ -495,6 +539,15 @@ if submit:
             with st.expander("Ver Traza de Decisiones del Motor Experto"):
                 for t in motor.traza:
                     st.text(t)
+
+        # --- BOTÓN DE DESCARGA PDF ---
+            pdf_bytes = generar_pdf(res, ciudad, personas)
+            st.download_button(
+                label="📄 Descargar Itinerario en PDF",
+                data=pdf_bytes,
+                file_name=f"Itinerario_{ciudad}.pdf",
+                mime="application/pdf"
+            )
 
         elif res['estado'] == 'REDUCIR_DIAS':
             st.warning(f"⚠️ CONFLICTO PRESUPUESTARIO: El costo mínimo evaluado (USD {res['costo_original']}) excede tu presupuesto.")
