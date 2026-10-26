@@ -426,6 +426,9 @@ class SistemaViajesJapon(KnowledgeEngine):
 
 # FUNCION PARA EXPORTACIÓN PDF
 
+from fpdf import FPDF
+import io
+
 def generar_pdf(resultado, ciudad, personas):
     pdf = FPDF()
     pdf.add_page()
@@ -445,10 +448,8 @@ def generar_pdf(resultado, ciudad, personas):
     pdf.cell(190, 10, text="Estimacion de Hospedaje", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Arial", size=11)
     for aloj in resultado['alojamientos']:
-        # Limpiamos caracteres problemáticos y forzamos codificación limpia
         texto_aloj = aloj.replace('•', '-').replace('~', '')
-        # Asignamos ancho de 190 expresamente para evitar el error de espacio horizontal
-        pdf.multi_cell(190, 8, text=texto_aloj)
+        pdf.multi_cell(190, 8, text=texto_aloj, new_x="LMARGIN", new_y="NEXT")
     pdf.ln(5)
 
     # Itinerario
@@ -461,7 +462,7 @@ def generar_pdf(resultado, ciudad, personas):
             texto = f"Dia {dia_num}: {nombre}"
         else:
             texto = f"Dia {dia_num}: {nombre} ({personas} pers. x USD {costo_unit} = USD {costo_tot})"
-        pdf.multi_cell(190, 8, text=texto)
+        pdf.multi_cell(190, 8, text=texto, new_x="LMARGIN", new_y="NEXT")
 
     return bytes(pdf.output())
 
@@ -492,7 +493,6 @@ with st.form("travel_form"):
     submit = st.form_submit_button("🔍 Ejecutar Inferencia Experta")
 
 if submit:
-    # 1. Validaciones
     errores = validar_solicitud(ciudad, presupuesto, dias, personas, fecha_inicio, fecha_fin, movilidad, perfil)
     
     if errores:
@@ -500,7 +500,6 @@ if submit:
         for e in errores:
             st.warning(f"• {e}")
     else:
-        # 2. Correr motor Rete
         motor = SistemaViajesJapon()
         motor.reset()
         
@@ -511,46 +510,50 @@ if submit:
                             desde=fecha_inicio, hasta=fecha_fin, movilidad=movilidad, perfil=perfil))
         motor.run()
         
-        # 3. Mostrar resultados
-        res = motor.resultado
+        # Guardar resultados en la memoria de la sesión
+        st.session_state['resultado_experto'] = motor.resultado
+        st.session_state['traza'] = motor.traza
+        st.session_state['datos_viaje'] = {'ciudad': ciudad, 'personas': personas, 'presupuesto': presupuesto}
+
+# Renderizar UI independiente del botón submit
+if 'resultado_experto' in st.session_state:
+    res = st.session_state['resultado_experto']
+    datos = st.session_state['datos_viaje']
+    
+    if res['estado'] == 'APROBADO':
+        st.success("✅ ¡ITINERARIO APROBADO Y GENERADO!")
+        saldo = datos['presupuesto'] - res['costo']
         
-        if res['estado'] == 'APROBADO':
-            st.success("✅ ¡ITINERARIO APROBADO Y GENERADO!")
-            saldo = presupuesto - res['costo']
-            
-            st.info(f"**🎢 Costo Total Actividades:** USD {res['costo']} (Saldo restante: USD {saldo})")
-            
-            # Hoteles
-            st.subheader(f"🏨 Estimación Referencial de Hospedaje en {ciudad.upper()}")
-            for linea in res['alojamientos']:
-                st.write(linea)
-            
-            # Itinerario
-            st.subheader("🗺️ Cronograma Diario Propuesto")
-            for d in res['itinerario']:
-                dia_num, nombre, costo_unit, costo_tot = d[0], d[1], d[2], d[3]
-                if "Descanso" in nombre:
-                    st.markdown(f"**🌿 Día {dia_num}:** {nombre}")
-                else:
-                    st.markdown(f"**📍 Día {dia_num}:** {nombre} _({personas} pers. x USD {costo_unit} = USD {costo_tot})_")
-                    
-            # Traza lógica (Explicabilidad)
-            with st.expander("Ver Traza de Decisiones del Motor Experto"):
-                for t in motor.traza:
-                    st.text(t)
+        st.info(f"**🎢 Costo Total Actividades:** USD {res['costo']} (Saldo restante: USD {saldo})")
+        
+        st.subheader(f"🏨 Estimación Referencial de Hospedaje en {datos['ciudad'].upper()}")
+        for linea in res['alojamientos']:
+            st.write(linea)
+        
+        st.subheader("🗺️ Cronograma Diario Propuesto")
+        for d in res['itinerario']:
+            dia_num, nombre, costo_unit, costo_tot = d[0], d[1], d[2], d[3]
+            if "Descanso" in nombre:
+                st.markdown(f"**🌿 Día {dia_num}:** {nombre}")
+            else:
+                st.markdown(f"**📍 Día {dia_num}:** {nombre} _({datos['personas']} pers. x USD {costo_unit} = USD {costo_tot})_")
+                
+        with st.expander("Ver Traza de Decisiones del Motor Experto"):
+            for t in st.session_state['traza']:
+                st.text(t)
+                
+        # Generar y mostrar botón de PDF
+        pdf_bytes = generar_pdf(res, datos['ciudad'], datos['personas'])
+        st.download_button(
+            label="📄 Descargar Itinerario en PDF",
+            data=pdf_bytes,
+            file_name=f"Itinerario_{datos['ciudad']}.pdf",
+            mime="application/pdf"
+        )
 
-        # --- BOTÓN DE DESCARGA PDF ---
-            pdf_bytes = generar_pdf(res, ciudad, personas)
-            st.download_button(
-                label="📄 Descargar Itinerario en PDF",
-                data=pdf_bytes,
-                file_name=f"Itinerario_{ciudad}.pdf",
-                mime="application/pdf"
-            )
-
-        elif res['estado'] == 'REDUCIR_DIAS':
-            st.warning(f"⚠️ CONFLICTO PRESUPUESTARIO: El costo mínimo evaluado (USD {res['costo_original']}) excede tu presupuesto.")
-            st.success(f"👉 **RELAJACIÓN APLICADA:** Se sugiere reducir la estadía a **{res['dias_propuestos']} días** para que el costo baje a **USD {res['nuevo_costo']}**.")
-            
-        else:
-            st.error(f"❌ BLOQUEO DEL SISTEMA: {res['motivo']}")
+    elif res['estado'] == 'REDUCIR_DIAS':
+        st.warning(f"⚠️ CONFLICTO PRESUPUESTARIO: El costo mínimo evaluado (USD {res['costo_original']}) excede tu presupuesto.")
+        st.success(f"👉 **RELAJACIÓN APLICADA:** Se sugiere reducir la estadía a **{res['dias_propuestos']} días** para que el costo baje a **USD {res['nuevo_costo']}**.")
+        
+    else:
+        st.error(f"❌ BLOQUEO DEL SISTEMA: {res['motivo']}")
