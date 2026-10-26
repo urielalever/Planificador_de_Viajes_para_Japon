@@ -432,27 +432,28 @@ def generar_pdf(resultado, ciudad, personas):
     
     # Título principal
     pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, txt=f"Itinerario Experto: {ciudad}", ln=True, align='C')
+    pdf.cell(190, 10, text=f"Itinerario Experto: {ciudad}", align='C', new_x="LMARGIN", new_y="NEXT")
     pdf.ln(5)
 
     # Resumen de Costos
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, txt=f"Costo Total Actividades: USD {resultado['costo']}", ln=True)
+    pdf.cell(190, 10, text=f"Costo Total Actividades: USD {resultado['costo']}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(5)
 
     # Alojamientos
     pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 10, txt="Estimacion de Hospedaje", ln=True)
+    pdf.cell(190, 10, text="Estimacion de Hospedaje", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Arial", size=11)
     for aloj in resultado['alojamientos']:
-        # Limpiamos caracteres especiales o viñetas complejas para compatibilidad
-        texto_aloj = aloj.replace('•', '-')
-        pdf.multi_cell(0, 8, txt=texto_aloj)
+        # Limpiamos caracteres problemáticos y forzamos codificación limpia
+        texto_aloj = aloj.replace('•', '-').replace('~', '')
+        # Asignamos ancho de 190 expresamente para evitar el error de espacio horizontal
+        pdf.multi_cell(190, 8, text=texto_aloj)
     pdf.ln(5)
 
     # Itinerario
     pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 10, txt="Cronograma Diario Propuesto", ln=True)
+    pdf.cell(190, 10, text="Cronograma Diario Propuesto", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Arial", size=11)
     for d in resultado['itinerario']:
         dia_num, nombre, costo_unit, costo_tot = d[0], d[1], d[2], d[3]
@@ -460,11 +461,9 @@ def generar_pdf(resultado, ciudad, personas):
             texto = f"Dia {dia_num}: {nombre}"
         else:
             texto = f"Dia {dia_num}: {nombre} ({personas} pers. x USD {costo_unit} = USD {costo_tot})"
-        pdf.multi_cell(0, 8, txt=texto)
+        pdf.multi_cell(190, 8, text=texto)
 
-    # Retornar el PDF como bytes para Streamlit
     return bytes(pdf.output())
-
 
 # ==============================================================================
 # INTERFAZ STREAMLIT
