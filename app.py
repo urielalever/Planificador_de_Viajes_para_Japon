@@ -19,7 +19,7 @@ CIUDADES_VALIDAS = ("Tokio", "Kioto", "Osaka", "Hiroshima", "Nara")
 
 PERFILES_VALIDOS = (
     "Cultural", "Recreativa", "Gastronómica", "Natural",
-    "Recreativo", "Gastronómico", "Moderno", "Explorador", "Relajante"
+    "Recreativo", "Gastronómico", "Moderno", "Explorador", "Relajante", "Ninguno"
 )
 
 # Catálogo oficial completo (134 actividades)
@@ -474,32 +474,77 @@ st.set_page_config(page_title="Experto en Viajes a Japón", page_icon="🏯", la
 st.title("🏯 Planificador Experto - Viajes a Japón")
 st.markdown("Este sistema experto deductivo genera itinerarios viables basados en inferencia lógica y reglas condicionales (Forward Chaining).")
 
-# Formulario de entrada de usuario
-with st.form("travel_form"):
-    col1, col2 = st.columns(2)
+# Funciones de callback para sincronizar Fechas y Días en tiempo real
+def actualizar_por_fechas():
+    if st.session_state.fecha_inicio and st.session_state.fecha_fin:
+        if st.session_state.fecha_fin >= st.session_state.fecha_inicio:
+            st.session_state.dias = (st.session_state.fecha_fin - st.session_state.fecha_inicio).days + 1
+        else:
+            st.session_state.dias = None
+
+def actualizar_por_dias():
+    if st.session_state.fecha_inicio and st.session_state.dias:
+        st.session_state.fecha_fin = st.session_state.fecha_inicio + timedelta(days=int(st.session_state.dias) - 1)
+
+# Iniciar la memoria de Streamlit para que vengan limpios
+if 'fecha_inicio' not in st.session_state: st.session_state.fecha_inicio = None
+if 'fecha_fin' not in st.session_state: st.session_state.fecha_fin = None
+if 'dias' not in st.session_state: st.session_state.dias = None
+
+col1, col2 = st.columns(2)
+
+with col1:
+    # Usamos index=None y value=None para que aparezcan vacíos por defecto
+    ciudad = st.selectbox("📍 Ciudad Destino", CIUDADES_VALIDAS, index=None, placeholder="Seleccioná una ciudad")
+    presupuesto = st.number_input("💰 Presupuesto para actividades (USD)", min_value=1, value=None, step=50, placeholder="Ej: 200")
+    personas = st.number_input("👥 Cantidad de personas", min_value=1, value=None, step=1, placeholder="Ej: 2")
+    perfil = st.selectbox("🎭 Perfil de Viaje (Opcional)", PERFILES_VALIDOS, index=None, placeholder="Sin especificar")
     
-    with col1:
-        ciudad = st.selectbox("📍 Ciudad Destino", CIUDADES_VALIDAS)
-        presupuesto = st.number_input("💰 Presupuesto para actividades (USD)", min_value=1, value=200, step=50)
-        personas = st.number_input("👥 Cantidad de personas", min_value=1, value=2, step=1)
-        perfil = st.selectbox("🎭 Perfil de Viaje", ("Cultural", "Recreativa", "Gastronómica", "Natural"))
-        
-    with col2:
-        dias = st.number_input("🗓️ Cantidad de Días de Estadía", min_value=1, max_value=15, value=7, step=1)
-        fecha_inicio = st.date_input("📅 Fecha de Inicio", value=date(2027, 4, 1))
-        fecha_fin = st.date_input("📅 Fecha de Fin (Ventana de viaje)", value=date(2027, 4, 20))
-        movilidad = st.checkbox("♿ Requiere Accesibilidad (Movilidad Reducida)")
-        
-    submit = st.form_submit_button("🔍 Ejecutar Inferencia Experta")
+with col2:
+    # Usamos on_change para disparar el cálculo automático apenas el usuario toca algo
+    st.date_input("📅 Fecha de Inicio", value=None, key="fecha_inicio", on_change=actualizar_por_dias)
+    st.date_input("📅 Fecha de Fin", value=None, key="fecha_fin", on_change=actualizar_por_fechas)
+    st.number_input("🗓️ Cantidad de Días de Estadía", min_value=1, max_value=15, value=None, step=1, key="dias", on_change=actualizar_por_dias)
+    
+    movilidad = st.checkbox("♿ Requiere Accesibilidad (Movilidad Reducida)")
+    
+# Usamos un botón nativo en vez de form_submit_button
+submit = st.button("🔍 Ejecutar Inferencia Experta")
 
 if submit:
-    errores = validar_solicitud(ciudad, presupuesto, dias, personas, fecha_inicio, fecha_fin, movilidad, perfil)
-    
-    if errores:
-        st.error("❌ ERROR EN PARÁMETROS (Inferencia Bloqueada):")
-        for e in errores:
-            st.warning(f"• {e}")
+    # Rescatamos los valores del estado (memoria) ya que están enlazados dinámicamente
+    fecha_in = st.session_state.fecha_inicio
+    fecha_out = st.session_state.fecha_fin
+    dias_est = st.session_state.dias
+
+    # 1. Validación de campos obligatorios vacíos
+    faltantes = []
+    if not ciudad: faltantes.append("Ciudad Destino")
+    if not presupuesto: faltantes.append("Presupuesto")
+    if not personas: faltantes.append("Cantidad de personas")
+    if not fecha_in: faltantes.append("Fecha de Inicio")
+    if not fecha_out: faltantes.append("Fecha de Fin")
+    if not dias_est: faltantes.append("Cantidad de Días")
+
+    if faltantes:
+        st.error("❌ Faltan completar los siguientes campos obligatorios:")
+        for f in faltantes:
+            st.warning(f"• {f}")
+            
+    elif fecha_out < fecha_in:
+        st.error("❌ Incoherencia: La Fecha de Fin no puede ser anterior a la de Inicio.")
+        
     else:
+        # Si no seleccionó perfil, mandamos "Ninguno" para no trabar el motor
+        perfil_final = perfil if perfil else "Ninguno"
+        
+        errores = validar_solicitud(ciudad, presupuesto, dias_est, personas, fecha_in, fecha_out, movilidad, perfil_final)
+        
+        if errores:
+            st.error("❌ ERROR EN PARÁMETROS (Inferencia Bloqueada):")
+            for e in errores:
+                st.warning(f"• {e}")
+        else:
         motor = SistemaViajesJapon()
         motor.reset()
         
