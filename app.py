@@ -426,9 +426,6 @@ class SistemaViajesJapon(KnowledgeEngine):
 
 # FUNCION PARA EXPORTACIÓN PDF
 
-from fpdf import FPDF
-import io
-
 def generar_pdf(resultado, ciudad, personas):
     pdf = FPDF()
     pdf.add_page()
@@ -436,6 +433,11 @@ def generar_pdf(resultado, ciudad, personas):
     # Título principal
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(190, 10, text=f"Itinerario Experto: {ciudad}", align='C', new_x="LMARGIN", new_y="NEXT")
+    
+    # --- NUEVO: Fecha de generación ---
+    pdf.set_font("Arial", 'I', 10) # Letra en cursiva (Italic) y más chica
+    fecha_actual = date.today().strftime("%d/%m/%Y")
+    pdf.cell(190, 8, text=f"Generado el: {fecha_actual}", align='R', new_x="LMARGIN", new_y="NEXT")
     pdf.ln(5)
 
     # Resumen de Costos
@@ -465,7 +467,6 @@ def generar_pdf(resultado, ciudad, personas):
         pdf.multi_cell(190, 8, text=texto, new_x="LMARGIN", new_y="NEXT")
 
     return bytes(pdf.output())
-
 # ==============================================================================
 # INTERFAZ STREAMLIT
 # ==============================================================================
