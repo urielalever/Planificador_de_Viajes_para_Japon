@@ -19,7 +19,7 @@ CIUDADES_VALIDAS = ("Tokio", "Kioto", "Osaka", "Hiroshima", "Nara")
 
 PERFILES_VALIDOS = (
     "Cultural", "Recreativa", "Gastronómica", "Natural",
-    "Recreativo", "Gastronómico", "Moderno", "Explorador", "Relajante", "Ninguno"
+    "Moderno", "Explorador", "Relajante", "Ninguno"
 )
 
 # Catálogo oficial completo (134 actividades)
