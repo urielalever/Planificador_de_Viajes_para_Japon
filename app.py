@@ -544,7 +544,7 @@ if submit:
             st.error("❌ ERROR EN PARÁMETROS (Inferencia Bloqueada):")
             for e in errores:
                 st.warning(f"• {e}")
-       if errores:
+        if errores:
             st.error("❌ ERROR EN PARÁMETROS (Inferencia Bloqueada):")
             for e in errores:
                 st.warning(f"• {e}")
