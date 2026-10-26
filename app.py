@@ -544,21 +544,26 @@ if submit:
             st.error("❌ ERROR EN PARÁMETROS (Inferencia Bloqueada):")
             for e in errores:
                 st.warning(f"• {e}")
+       if errores:
+            st.error("❌ ERROR EN PARÁMETROS (Inferencia Bloqueada):")
+            for e in errores:
+                st.warning(f"• {e}")
         else:
-        motor = SistemaViajesJapon()
-        motor.reset()
-        
-        for act in CATALOGO_ACTIVIDADES:
-            motor.declare(Actividad(**act))
+            # 2. Correr motor Rete
+            motor = SistemaViajesJapon()
+            motor.reset()
             
-        motor.declare(Viaje(ciudad=ciudad, presupuesto=presupuesto, dias=dias, personas=personas,
-                            desde=fecha_inicio, hasta=fecha_fin, movilidad=movilidad, perfil=perfil))
-        motor.run()
-        
-        # Guardar resultados en la memoria de la sesión
-        st.session_state['resultado_experto'] = motor.resultado
-        st.session_state['traza'] = motor.traza
-        st.session_state['datos_viaje'] = {'ciudad': ciudad, 'personas': personas, 'presupuesto': presupuesto}
+            for act in CATALOGO_ACTIVIDADES:
+                motor.declare(Actividad(**act))
+                
+            motor.declare(Viaje(ciudad=ciudad, presupuesto=presupuesto, dias=dias_est, personas=personas,
+                                desde=fecha_in, hasta=fecha_out, movilidad=movilidad, perfil=perfil_final))
+            motor.run()
+            
+            # Guardar resultados en la memoria de la sesión
+            st.session_state['resultado_experto'] = motor.resultado
+            st.session_state['traza'] = motor.traza
+            st.session_state['datos_viaje'] = {'ciudad': ciudad, 'personas': personas, 'presupuesto': presupuesto}
 
 # Renderizar UI independiente del botón submit
 if 'resultado_experto' in st.session_state:
