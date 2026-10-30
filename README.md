@@ -1,6 +1,8 @@
 # 🏯 Sistema Experto de Planificación de Viajes a Japón
 
-Sistema experto deductivo (*Forward Chaining*) desarrollado en Python con **Experta** y presentado mediante **Streamlit**.
+Sistema experto deductivo (*Forward Chaining*) desarrollado en Python(Versión 3.10) con **Experta** y presentado mediante **Streamlit**.
+Grupo Proveedor: Grupo C
+Grupo Cliente: Grupo D
 
 ## Contenido del Repositorio
 * **`app.py`:** Interfaz web interactiva desarrollada con Streamlit.
